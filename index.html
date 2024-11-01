@@ -7,12 +7,19 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
-    <h2>Upload Blue Sky Report</h2>
+    <h2>Form D & Blue Sky Filing Fees Calculator</h2>
+    <p>Upload blue sky report. Be sure the header "State" and "Contribution Amount" are on the first row, and the tab is named "Sheet1".</p>
+
+    <br>
     
     <input type="file" id="fileInput" accept=".xlsx, .xls" />
-    <button onclick="parseExcel()">Parse Excel File</button>
+    <button onclick="parseExcel()">Parse Sheet & Calculate Fees</button>
     
-    <h3>Extracted Data</h3>
+    <h3>Total Notice Filing Fees: $<span id="totalFees">0.00</span></h3>
+    
+    <br><br>
+
+    <h4>State Fees Breakdown</h4>
     <table border="1" id="outputTable">
         <thead>
             <tr>
@@ -98,7 +105,7 @@
                         "MD": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
                         "MA": { minFee: 250, maxFee: 750, percentage: 0, minLimit: 0, maxLimit: 0 },
                         "MI": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
-                        "MN": { minFee: 100, maxFee: 300, percentage: 0.001, minLimit: 0, maxLimit: 300 },
+                        "MN": { baseFee: 100, percentage: 0.001, maxPercentageFee: 200, combinedMax: 300 },
                         "MS": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
                         "MO": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
                         "MT": { minFee: 200, maxFee: 800, percentage: 0, minLimit: 0, maxLimit: 800 },
@@ -130,6 +137,8 @@
                         "WY": { minFee: 200, maxFee: 200, percentage: 0, minLimit: 0, maxLimit: 0 }
                 };
 
+                let totalFees = 0;
+
                 jsonData.slice(1).forEach(row => {
                     const state = row[stateIndex];
                     const contribution = row[contributionIndex];
@@ -147,12 +156,23 @@
                         contributionCell.textContent = currencyFormatter.format(contribution);
                         rowElement.appendChild(contributionCell);
 
-                        // Notice Fee Total cell
+                        // Notice Fee Total calculation
                         const feeData = stateFeeData[state];
-                        let noticeFee = feeData.percentage > 0 
-                            ? Math.min(Math.max(feeData.percentage * contribution, feeData.minLimit), feeData.maxLimit)
-                            : feeData.minFee;
+                        let noticeFee;
+                        if (feeData.baseFee) { // Minnesota or any other state with custom "base + percentage" logic
+                            const percentageFee = Math.min(feeData.percentage * contribution, feeData.maxPercentageFee);
+                            noticeFee = Math.min(feeData.baseFee + percentageFee, feeData.combinedMax);
+                        } else {
+                            // Default rule for other states
+                            noticeFee = feeData.percentage > 0 
+                                ? Math.min(Math.max(feeData.percentage * contribution, feeData.minLimit), feeData.maxLimit)
+                                : feeData.minFee;
+                        }
 
+                        // Add to total fees
+                        totalFees += noticeFee;
+
+                        // Notice Fee Total cell
                         const noticeFeeCell = document.createElement("td");
                         noticeFeeCell.textContent = currencyFormatter.format(noticeFee);
                         rowElement.appendChild(noticeFeeCell);
@@ -160,6 +180,9 @@
                         outputBody.appendChild(rowElement);
                     }
                 });
+
+                // Display the total fees at the top of the table
+                document.getElementById("totalFees").textContent = currencyFormatter.format(totalFees);
             };
 
             reader.readAsArrayBuffer(file);
