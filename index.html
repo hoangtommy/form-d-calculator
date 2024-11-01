@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blue Sky Report Parser</title>
+    <title>Blue Sky Report Parser with Notice Fee Calculation</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
@@ -18,6 +18,7 @@
             <tr>
                 <th>State</th>
                 <th>Contribution Amount</th>
+                <th>Notice Fee Total</th>
             </tr>
         </thead>
         <tbody id="outputBody">
@@ -40,7 +41,6 @@
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: "array" });
                 
-                // Get the first sheet which is "Blue Sky Report" by default
                 const sheetName = "Sheet1";
                 const worksheet = workbook.Sheets[sheetName];
                 
@@ -50,8 +50,7 @@
                 }
 
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                
-                // Find columns for State and Contribution Amount
+
                 let stateIndex = null;
                 let contributionIndex = null;
                 const headers = jsonData[0];
@@ -67,28 +66,96 @@
                 }
 
                 const outputBody = document.getElementById("outputBody");
-                outputBody.innerHTML = "";  // Clear existing data
+                outputBody.innerHTML = "";
 
-                // Formatter for currency display
                 const currencyFormatter = new Intl.NumberFormat('en-US', {
                     style: 'currency',
                     currency: 'USD'
                 });
 
+                // Define the state fee logic
+                const stateFeeData = {
+                        "AL": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "AK": { minFee: 600, maxFee: 600, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "AZ": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "AR": { minFee: 100, maxFee: 500, percentage: 0.001, minLimit: 100, maxLimit: 500 },
+                        "CA": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "CO": { minFee: 50, maxFee: 50, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "CT": { minFee: 150, maxFee: 150, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "DE": { minFee: 200, maxFee: 1000, percentage: 0.005, minLimit: 0, maxLimit: 1000 },
+                        "DC": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "FL": { minFee: 0, maxFee: 0, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "GA": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "HI": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "ID": { minFee: 50, maxFee: 50, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "IL": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "IN": { minFee: 0, maxFee: 0, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "IA": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "KS": { minFee: 125, maxFee: 125, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "KY": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "LA": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "ME": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MD": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MA": { minFee: 250, maxFee: 750, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MI": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MN": { minFee: 100, maxFee: 300, percentage: 0.001, minLimit: 0, maxLimit: 300 },
+                        "MS": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MO": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "MT": { minFee: 200, maxFee: 800, percentage: 0, minLimit: 0, maxLimit: 800 },
+                        "NE": { minFee: 200, maxFee: 200, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NV": { minFee: 500, maxFee: 500, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NH": { minFee: 500, maxFee: 500, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NJ": { minFee: 500, maxFee: 500, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NM": { minFee: 350, maxFee: 350, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NY": { minFee: 300, maxFee: 1200, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "NC": { minFee: 350, maxFee: 350, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "ND": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "OH": { minFee: 100, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "OK": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "OR": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "PA": { minFee: 525, maxFee: 525, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "PR": { minFee: 350, maxFee: 1500, percentage: 0.002, minLimit: 0, maxLimit: 0 },
+                        "RI": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "SC": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "SD": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "TN": { minFee: 500, maxFee: 500, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "TX": { minFee: 0, maxFee: 500, percentage: 0.001, minLimit: 0, maxLimit: 500 },
+                        "VI": { minFee: 1500, maxFee: 1500, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "UT": { minFee: 0, maxFee: 100, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "VT": { minFee: 600, maxFee: 600, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "VA": { minFee: 250, maxFee: 250, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "WA": { minFee: 300, maxFee: 300, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "WV": { minFee: 125, maxFee: 125, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "WI": { minFee: 200, maxFee: 200, percentage: 0, minLimit: 0, maxLimit: 0 },
+                        "WY": { minFee: 200, maxFee: 200, percentage: 0, minLimit: 0, maxLimit: 0 }
+                };
+
                 jsonData.slice(1).forEach(row => {
                     const state = row[stateIndex];
                     const contribution = row[contributionIndex];
-                    
-                    if (state && contribution !== undefined) {
+
+                    if (state && contribution !== undefined && stateFeeData[state]) {
                         const rowElement = document.createElement("tr");
 
+                        // State cell
                         const stateCell = document.createElement("td");
                         stateCell.textContent = state;
                         rowElement.appendChild(stateCell);
 
+                        // Contribution Amount cell
                         const contributionCell = document.createElement("td");
                         contributionCell.textContent = currencyFormatter.format(contribution);
                         rowElement.appendChild(contributionCell);
+
+                        // Notice Fee Total cell
+                        const feeData = stateFeeData[state];
+                        let noticeFee = feeData.percentage > 0 
+                            ? Math.min(Math.max(feeData.percentage * contribution, feeData.minLimit), feeData.maxLimit)
+                            : feeData.minFee;
+
+                        const noticeFeeCell = document.createElement("td");
+                        noticeFeeCell.textContent = currencyFormatter.format(noticeFee);
+                        rowElement.appendChild(noticeFeeCell);
 
                         outputBody.appendChild(rowElement);
                     }
