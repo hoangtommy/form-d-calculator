@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue Sky Report Parser</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+    <h2>Upload Blue Sky Report</h2>
+    
+    <input type="file" id="fileInput" accept=".xlsx, .xls" />
+    <button onclick="parseExcel()">Parse Excel File</button>
+    
+    <h3>Extracted Data</h3>
+    <table border="1" id="outputTable">
+        <thead>
+            <tr>
+                <th>State</th>
+                <th>Contribution Amount</th>
+            </tr>
+        </thead>
+        <tbody id="outputBody">
+            <!-- Extracted data will appear here -->
+        </tbody>
+    </table>
+
+    <script>
+        function parseExcel() {
+            const fileInput = document.getElementById("fileInput");
+            if (!fileInput.files.length) {
+                alert("Please select a file first.");
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: "array" });
+                
+                // Get the first sheet which is "Blue Sky Report" by default
+                const sheetName = "Sheet1";
+                const worksheet = workbook.Sheets[sheetName];
+                
+                if (!worksheet) {
+                    alert("Sheet1 tab not found.");
+                    return;
+                }
+
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                // Find columns for State and Contribution Amount
+                let stateIndex = null;
+                let contributionIndex = null;
+                const headers = jsonData[0];
+
+                headers.forEach((header, index) => {
+                    if (header && header.toString().toLowerCase().includes("state")) stateIndex = index;
+                    if (header && header.toString().toLowerCase().includes("contribution")) contributionIndex = index;
+                });
+
+                if (stateIndex === null || contributionIndex === null) {
+                    alert("Could not find 'State' or 'Contribution Amount' columns.");
+                    return;
+                }
+
+                const outputBody = document.getElementById("outputBody");
+                outputBody.innerHTML = "";  // Clear existing data
+
+                // Formatter for currency display
+                const currencyFormatter = new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD'
+                });
+
+                jsonData.slice(1).forEach(row => {
+                    const state = row[stateIndex];
+                    const contribution = row[contributionIndex];
+                    
+                    if (state && contribution !== undefined) {
+                        const rowElement = document.createElement("tr");
+
+                        const stateCell = document.createElement("td");
+                        stateCell.textContent = state;
+                        rowElement.appendChild(stateCell);
+
+                        const contributionCell = document.createElement("td");
+                        contributionCell.textContent = currencyFormatter.format(contribution);
+                        rowElement.appendChild(contributionCell);
+
+                        outputBody.appendChild(rowElement);
+                    }
+                });
+            };
+
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
